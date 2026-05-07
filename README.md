@@ -1,4 +1,4 @@
-# toaster_engine_v1 ♞
+# toaster_engine ♞
 
 A custom C++ chess engine currently targeting strength beyond my own (~1500 rapid).
 
