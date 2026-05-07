@@ -14,7 +14,7 @@
 #include <chrono>
 #include <random>
 #include <memory>
-#include "state_copy.h"
+#include "state.h"
 #include "magic.h"
 #include "pst.h"
 #include <chrono>

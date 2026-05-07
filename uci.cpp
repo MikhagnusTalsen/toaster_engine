@@ -2,7 +2,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
-#include "state_copy.h"
+#include "state.h"
 #include <cstdio>
 
 // int main()
