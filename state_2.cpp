@@ -174,9 +174,25 @@ std::unique_ptr<TTentry[]> transposition_table(new TTentry[TTsize]);
 
 FORCE_INLINE void tt_replace(uint32_t tt_hash, TTentry &entry)
 {
-    if (transposition_table[tt_hash].hash == entry.hash || transposition_table[tt_hash].depth <= entry.depth) 
+    if (transposition_table[tt_hash].hash == entry.hash) 
+    {
+        if (entry.best_move == 0) {
+            entry.best_move = transposition_table[tt_hash].best_move;
+        }
+        if (transposition_table[tt_hash].depth <= entry.depth) {
+            transposition_table[tt_hash] = entry;
+        } 
+        else 
+        {
+            // don't overwrite the deep score but update the PV move
+            transposition_table[tt_hash].best_move = entry.best_move;
+        }
+        // transposition_table[tt_hash] = entry;
+    }
+    else if (transposition_table[tt_hash].depth <= entry.depth)
     {
         transposition_table[tt_hash] = entry;
+
     }
 }
 
@@ -2118,7 +2134,7 @@ int quiescence(GameState &game, int alpha, int beta, int depth)
     NODES++;
     int stand_pat = game.evaluation();
     if (stand_pat >= beta)
-        return beta;
+        return stand_pat;
     if (stand_pat > alpha)
         alpha = stand_pat;
 
@@ -2156,7 +2172,7 @@ int quiescence(GameState &game, int alpha, int beta, int depth)
             continue;
         }
         legal_moves++;
-        NODES++;
+        // NODES++;
         int score = -quiescence(game, -beta, -alpha, depth);
 
         game.unmake_move(move);
@@ -2166,7 +2182,7 @@ int quiescence(GameState &game, int alpha, int beta, int depth)
         if (stop_search) return 0;
 
         if (score >= beta)
-            return beta;
+            return score;
         alpha = std::max(alpha, score);
     }
 
@@ -2208,11 +2224,11 @@ int nigamax(int depth, GameState &game, int alpha, int beta, bool allow_null = t
             }
             else if (temp_entry.flag == HASH_BETA && temp_entry.score >= beta)
             {
-                return beta; // Lower bound proves it's too good for the opponent. Cutoff.
+                return temp_entry.score; // Lower bound proves it's too good for the opponent. Cutoff.
             }
             else if (temp_entry.flag == HASH_ALPHA && temp_entry.score <= alpha)
             {
-                return alpha; // Upper bound proves it's terrible for us. Cutoff.
+                return temp_entry.score; // Upper bound proves it's terrible for us. Cutoff.
             }
         }
         if (temp_entry.hash == game.current_hash && temp_entry.best_move != 0)
@@ -2247,7 +2263,7 @@ int nigamax(int depth, GameState &game, int alpha, int beta, bool allow_null = t
 
             if (score >= beta)
             {
-                return beta;
+                return score;
             }
         }
     }
@@ -2280,7 +2296,7 @@ int nigamax(int depth, GameState &game, int alpha, int beta, bool allow_null = t
             continue;
         }
         legal_moves++;
-        NODES++;
+        // NODES++;
         
         // LMR
         int score = 0;
@@ -2357,7 +2373,7 @@ int nigamax(int depth, GameState &game, int alpha, int beta, bool allow_null = t
                 }
             }
 
-            return beta;
+            return score;
         }
         if (score > alpha)
         {
@@ -2371,13 +2387,15 @@ int nigamax(int depth, GameState &game, int alpha, int beta, bool allow_null = t
     {
         if (game.is_square_attacked(__builtin_ctzll(game.bitboard[game.side_to_move ? BLACK_KING : WHITE_KING]), game.side_to_move ^ 1))
         {
-            best_move = {0, -900000 - depth};
-            entry.best_move = best_move.move;
+            entry.score = -900000 - depth;
+            entry.flag = HASH_EXACT;
+            entry.best_move = 0;
             tt_replace(tt_hash, entry);
             return -900000 - depth;
         }
-        best_move = {0, 0};
-        entry.best_move = best_move.move;
+        entry.score = 0;
+        entry.flag = HASH_EXACT;
+        entry.best_move = 0;
         tt_replace(tt_hash, entry);
         return 0;
     }
@@ -2391,6 +2409,7 @@ int nigamax(int depth, GameState &game, int alpha, int beta, bool allow_null = t
 
 int32_t root(int depth, GameState &game, int alpha, int beta, uint16_t &best_move_out)
 {
+    NODES++;
     TTentry entry;
     entry.hash = game.current_hash;
     entry.depth = depth;
@@ -2407,6 +2426,14 @@ int32_t root(int depth, GameState &game, int alpha, int beta, uint16_t &best_mov
             {
                 best_move_out =  temp_entry.best_move;
                 return temp_entry.score;
+            }
+            else if (temp_entry.flag == HASH_BETA && temp_entry.score >= beta)
+            {
+                return temp_entry.score; // Lower bound proves it's too good for the opponent. Cutoff.
+            }
+            else if (temp_entry.flag == HASH_ALPHA && temp_entry.score <= alpha)
+            {
+                return temp_entry.score; // Upper bound proves it's terrible for us. Cutoff.
             }
             
         }
@@ -2448,7 +2475,7 @@ int32_t root(int depth, GameState &game, int alpha, int beta, uint16_t &best_mov
         }
         legal_moves++;
         // std::cout << print_move(move) << " " << legal_moves << std::endl;
-        NODES++;
+        // NODES++;
         int score = 0;
         bool isCheck = game.is_square_attacked(__builtin_ctzll(game.bitboard[game.side_to_move ? BLACK_KING : WHITE_KING]), game.side_to_move ^ 1);
 
@@ -2510,17 +2537,19 @@ int32_t root(int depth, GameState &game, int alpha, int beta, uint16_t &best_mov
     {
         if (game.is_square_attacked(__builtin_ctzll(game.bitboard[game.side_to_move ? BLACK_KING : WHITE_KING]), game.side_to_move ^ 1))
         {
-            best_move = {0, -900000 - depth};
-            entry.best_move = best_move.move;
+            entry.score = -900000 - depth;
+            entry.flag = HASH_EXACT;
+            entry.best_move = 0;
             tt_replace(tt_hash, entry);
-            best_move_out =  0;
-            return alpha;
+            best_move_out = 0;
+            return -900000 - depth;
         } // FFFF TTTT TTFF FFFFF
-        best_move = {0, 0};
-        entry.best_move = best_move.move;
+        entry.score = -900000 - depth;
+        entry.flag = HASH_EXACT;
+        entry.best_move = 0;
         tt_replace(tt_hash, entry);
-        best_move_out =  0;
-        return alpha;
+        best_move_out = 0;
+        return 0;
     }
 
     entry.score = alpha;
