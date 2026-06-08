@@ -1,5 +1,5 @@
 CXX = g++
-CXX_FLAGS = -std=c++20 -Wall -O3 -march=native -flto
+CXX_FLAGS = -std=c++14 -Wall -O3 -march=native -flto=auto
 
 TARGET = engine
 SRC = $(wildcard *.cpp)
@@ -19,4 +19,7 @@ run: all
 clean:
 	rm -f $(TARGET) $(OBJ)
 
-# g++ -std=c++20 -O3 -march=native -flto <all .cpp files> -o chess
+# g++ -std=c++14 -O3 -march=native -flto=auto <all .cpp files> -o engine
+# g++ -std=c++14 -O3 -march=native -flto=auto magic.cpp pst.cpp uci.cpp state_2.cpp -o engine
+
+
