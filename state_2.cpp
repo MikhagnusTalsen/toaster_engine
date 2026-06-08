@@ -1757,11 +1757,11 @@ public:
 
                     if (promo_char == 'q' && !(flag == QUEEN_PROMOTION || flag == QUEEN_PROMOTION_AND_CAPTURE))
                         continue;
-                    else if (promo_char == 'r' && !(flag == ROOK_PROMOTION || flag == ROOK_PROMOTION))
+                    else if (promo_char == 'r' && !(flag == ROOK_PROMOTION || flag == ROOK_PROMOTION_AND_CAPTURE))
                         continue;
-                    else if (promo_char == 'b' && (flag == BISHOP_PROMOTION || flag == BISHOP_PROMOTION_AND_CAPTURE))
+                    else if (promo_char == 'b' && !(flag == BISHOP_PROMOTION || flag == BISHOP_PROMOTION_AND_CAPTURE))
                         continue;
-                    else if (promo_char == 'n' && (flag == KNIGHT_PROMOTION || flag == KNIGHT_PROMOTION_AND_CAPTURE))
+                    else if (promo_char == 'n' && !(flag == KNIGHT_PROMOTION || flag == KNIGHT_PROMOTION_AND_CAPTURE))
                         continue;
                 }
                 return move.move;
