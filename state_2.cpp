@@ -2198,8 +2198,30 @@ int nigamax(int depth, GameState &game, int alpha, int beta, bool allow_null = t
         }
         if (temp_entry.hash == game.current_hash && temp_entry.best_move != 0)
         {
-            tt_move.move = temp_entry.best_move;
-            list.moves_list[list.move_count++] = {tt_move.move, 200000};
+            uint8_t from_square = temp_entry.best_move & 0x3f;
+            uint8_t to_square = (temp_entry.best_move >> 6) & 0x3f;
+            uint8_t flag = (temp_entry.best_move >> 12) & 0x0f;
+            
+            // check if piece is on from square and same colour peice is not on to square
+            bool occupancy_flag = game.occupancy[game.side_to_move] & (1ULL << from_square) &&
+                                  !(game.occupancy[game.side_to_move] & (1ULL << to_square));
+
+            // check if a non capture move does not have a piece on to square
+            bool quit_move_flag = (flag == STANDARD_QUIET_MOVE ||
+                           ((flag >= KNIGHT_PROMOTION) && (flag <= QUEEN_PROMOTION)) ||
+                           ((flag >= EN_PASSANT) && (flag <= QUEENSIDE_CASTLE)))
+                           && (game.piece_on_square[to_square] == -1);
+
+            // check if a capture move have a piece on to square
+            bool capture_move_flag = (flag == STANDARD_CAPTURE ||
+                                     ((flag >= KNIGHT_PROMOTION_AND_CAPTURE) && (flag <= QUEEN_PROMOTION_AND_CAPTURE)))
+                                     && (game.piece_on_square[to_square] != -1);
+
+            if (occupancy_flag && (quit_move_flag || capture_move_flag))
+            {
+                tt_move.move = temp_entry.best_move;
+                list.moves_list[list.move_count++] = {tt_move.move, 200000};
+            }
         }
         // list.moves_list[list.move_count++] = temp_entry.best_move;
     }
@@ -2403,9 +2425,30 @@ int32_t root(int depth, GameState &game, int alpha, int beta, uint16_t &best_mov
             
         }
         if (temp_entry.hash == game.current_hash && temp_entry.best_move != 0)
-        {
-            tt_move. move = temp_entry.best_move;
-            list.moves_list[list.move_count++] = {tt_move.move, 200000};
+        { 
+            uint8_t from_square = temp_entry.best_move & 0x3f;
+            uint8_t to_square = (temp_entry.best_move >> 6) & 0x3f;
+            uint8_t flag = (temp_entry.best_move >> 12) & 0x0f;
+
+            // check if piece is on from square and same colour peice is not on to square
+            bool occupancy_flag = game.occupancy[game.side_to_move] & (1ULL << from_square) &&
+                                  !(game.occupancy[game.side_to_move] & (1ULL << to_square));
+            
+            // check if a non capture move does not have a piece on to square
+            bool quit_move_flag = (flag == STANDARD_QUIET_MOVE ||
+                           ((flag >= KNIGHT_PROMOTION) && (flag <= QUEEN_PROMOTION)) ||
+                           ((flag >= EN_PASSANT) && (flag <= QUEENSIDE_CASTLE)))
+                           && (game.piece_on_square[to_square] == -1);
+            
+            // check if a capture move have a piece on to square
+            bool capture_move_flag = (flag == STANDARD_CAPTURE ||
+                                     ((flag >= KNIGHT_PROMOTION_AND_CAPTURE) && (flag <= QUEEN_PROMOTION_AND_CAPTURE)))
+                                     && (game.piece_on_square[to_square] != -1);
+            if (occupancy_flag && (quit_move_flag || capture_move_flag))
+            {
+                tt_move.move = temp_entry.best_move;
+                list.moves_list[list.move_count++] = {tt_move.move, 200000};
+            }
         }
         // list.moves_list[list.move_count++] = temp_entry.best_move;
     }
