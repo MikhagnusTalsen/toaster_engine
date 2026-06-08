@@ -420,7 +420,6 @@ public:
     }
     void init_eval()
     {
-
         for (int sq = 0; sq < 64; sq++)
         {
             int p = piece_on_square[sq];
@@ -1800,7 +1799,6 @@ uint64_t rook_attacks_mask(int square)
 // return a mask for all squares where the bishop can be blocked
 uint64_t bishop_attacks_mask(int square)
 {
-
     int rank = square / 8;
     int file = square % 8;
 
