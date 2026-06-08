@@ -1,39 +1,43 @@
 # toaster_engine ♞
 
-A custom C++ chess engine currently targeting strength beyond my own (~1500 rapid).
+A custom C++ chess engine currently targeting strength beyond my own (~1600 rapid).
 
-> Focused on search, pruning, and engine optimization techniques.
+Focused on search, pruning, and engine optimization techniques.
 
-`Status:` Active Development
+`Reports:` [Performance Report](PERFORMANCE.md)
 
----
+## Contents
+- [Feature](#features)
+- [Build](#build)
+- [Requirements](#requirements)
+- [Protocol](#protocol)
+- [Roadmap](#roadmap)
 
 ## Features
 
-Current search and evaluation techniques implemented:
+### Search
 
 - Negamax Search
 - Alpha-Beta Pruning
-- Null Move Pruning
-- Quiescence Search
+- Null Move Pruning (NMP)
+- Quiescence Search 
 - Iterative Deepening
 - Aspiration Windows
 - Transposition Tables
-- Piece-Square Tables
-
-### Move Ordering
-
-- MVV-LVA
-- Killer Moves
-- History Heuristics
-- Principal Variation Search
-
-### Search Improvements
-
 - Late Move Reductions (LMR)
 - Check Extensions
 
----
+### Move Ordering
+
+- Most Valuable Victim - Least Valuable Attacker (MVV-LVA) 
+- Killer Moves
+- History Heuristics
+- Principal Variation Search (PVS)
+
+### Evaluation 
+
+- Piece-Square Tables (PeSTO)
+- Tapered Evaluation  
 
 ## Build
 
@@ -43,7 +47,7 @@ Build and run with compiler optimizations enabled:
 
 - `-O3`
 - `-march=native`
-- `-flto`
+- `-flto=auto`
 
 ```bash
 make run
@@ -52,7 +56,7 @@ make run
 ### Manual Compilation
 
 ```bash
-g++ -std=c++20 -O3 -march=native -flto \
+g++ -std=c++20 -O3 -march=native -flto=auto \
 magic.cpp pst.cpp uci.cpp state_2.cpp \
 -o engine
 ```
@@ -76,8 +80,7 @@ magic.cpp pst.cpp uci.cpp state_2.cpp \
 
 ## Requirements
 
-- GCC with C++20 support
-- Clang should work as well
+- GCC with C++14 support (Clang should work as well)
 - `make`
 - Linux / Ubuntu environment recommended
 
@@ -87,11 +90,13 @@ magic.cpp pst.cpp uci.cpp state_2.cpp \
 
 The engine communicates using the UCI (Universal Chess Interface) protocol and can be connected to chess GUIs such as:
 
-- Cute Chess *(preferred)*
+- Cute Chess *(preferred for lightweight)*
 - Arena
 - Banksia GUI
 
 ### Supported UCI Commands
+
+This allows the engine to interface with compatible chess GUIs for gameplay, testing, and search analysis.
 
 - `uci`
 - `isready`
@@ -102,8 +107,9 @@ The engine communicates using the UCI (Universal Chess Interface) protocol and c
 
 - `go depth <DEPTH>`
 - `go movetime <TIME(ms)>`
+- `go wtime <TIME(ms)> btime <TIME(ms)> winc <TIME(ms)> binc <TIME(ms)>`
 
-This allows the engine to interface with compatible chess GUIs for gameplay, testing, and search analysis.
+`depth` can be used together with  `movetime`, `wtime btime winc binc`.
 
 ---
 
@@ -113,15 +119,16 @@ This allows the engine to interface with compatible chess GUIs for gameplay, tes
 
 Focus on implementing core search and pruning techniques to create a stable and functional engine.
 
-### Version 2 — Optimization
+### Version 2 — New Features and Optimization
 
 Focus on:
 
 - Better resource utilization
 - Lower-level performance improvements
 - Faster move generation and search efficiency
-- Evaluation tuning
+- NNUE Integration
 
 ### Version 3 — TBD
 
-To be decided.
+- Multithreading
+- To be decided.
