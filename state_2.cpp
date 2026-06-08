@@ -18,6 +18,7 @@
 #include "magic.h"
 #include "pst.h"
 #include <chrono>
+// #include <cstring>
 
 const uint64_t RANK_7_MASK = 0X00ff000000000000;
 const uint64_t RANK_5_MASK = 0X000000ff00000000;
@@ -172,6 +173,20 @@ std::unique_ptr<TTentry[]> transposition_table(new TTentry[TTsize]);
 
 // TTentry *transposition_table = new TTentry[10000000];
 
+void clear_TT()
+{
+    for (size_t i = 0; i < TTsize; ++i)
+    {
+        transposition_table[i].hash = 0;
+    }
+    //std::memset
+    //(
+    //    transposition_table.get(),
+    //    0,
+    //    TTsize * sizeof(TTentry)
+    //);
+}
+
 FORCE_INLINE void tt_replace(uint32_t tt_hash, TTentry &entry)
 {
     if (transposition_table[tt_hash].hash == entry.hash) 
@@ -198,7 +213,8 @@ FORCE_INLINE void tt_replace(uint32_t tt_hash, TTentry &entry)
 
 bool stop_search = false;
 std::chrono::_V2::system_clock::time_point timer_start;
-std::chrono::duration<int64_t, std::milli> max_time;
+std::chrono::duration<int64_t, std::milli> soft_time;
+std::chrono::duration<int64_t, std::milli> hard_time;
 int NODES = 0;
 class GameState
 {
@@ -2195,7 +2211,7 @@ int nigamax(int depth, GameState &game, int alpha, int beta, bool allow_null = t
     NODES++;
     if ((NODES & (2047)) == 0) 
     {
-        if ((std::chrono::high_resolution_clock::now() - timer_start) >= max_time) 
+        if ((std::chrono::high_resolution_clock::now() - timer_start) >= hard_time) 
         {
             stop_search = true;
             return 0;
@@ -2590,81 +2606,42 @@ void set_position(std::string fen, std::vector<std::string> &moves)
     }
 }
 
-void search_fixed_depth(int depth)
+void search(int depth, int movetime, int wtime, int btime, int winc, int binc)
 {
-    // Run minimax to 'depth'
-    // std::cout << "bestmove " << best_move << "\n";
-    // uint16_t best_move = root(depth, game);
-    int max_depth = depth;
-    int previous_score = 0;
-
-    stop_search = false;
-    timer_start = std::chrono::high_resolution_clock::now();
-    max_time = std::chrono::milliseconds(36000000);
+    int max_depth = 100; // max number of plys to search for
+    int soft_time_limit_ms = 36000000; // optimal time allowed to play the current move
+    int hard_time_limit_ms = 36000000; // absolute max time allowed to play the current move
+    int buffer = 50; // for latency and overhead to avoid acciedental flagging
     
-    uint16_t best_move = 0;
-    
-    for (int curr_depth = 1; curr_depth <= max_depth; curr_depth++)
+    if (depth > 0) max_depth = depth;
+    if (movetime > 0) 
     {
-        std::cout << "Depth         : " << curr_depth << "\n";
-        auto start = std::chrono::high_resolution_clock::now();
+        soft_time_limit_ms = movetime - buffer;
+        hard_time_limit_ms = movetime - buffer; 
+    }  
+    if (wtime > 0 && btime > 0) 
+    {
+        int safe_divisor = 40; // an expected safe number of moves that are left to play
+        int absolute_divisor = 10; // an expected min number of moves left to play in a complex position
+        int total_time = game.side_to_move ? btime : wtime; // total time left
+        int inc = game.side_to_move ? binc : winc; // increament per move
 
-        int window = 50; // 50 centipawns (half a pawn)
-        int alpha = previous_score - window;
-        int beta = previous_score + window;
-
-        uint16_t curr_move = 0;
-        int32_t current_score = 0;
-
-        while (true) 
-        {
-            if (curr_depth <= 3) 
-            {
-                alpha = -1000000;
-                beta = 1000000;
-            }
-
-            current_score = root(curr_depth, game, alpha , beta, curr_move); // 2ms
-
-            if (current_score <= alpha)
-            {
-                alpha = -1000000;
-                continue; 
-            }
-            else if (current_score >= beta)
-            {
-                beta = 1000000;
-                continue;
-            }
-            break;
-        }
+        soft_time_limit_ms = (total_time / safe_divisor) + static_cast<int>(inc * 0.7) - buffer;
+        hard_time_limit_ms = (total_time / absolute_divisor) - buffer;
         
-        best_move = curr_move;
-        previous_score = current_score;
+        if (soft_time_limit_ms > total_time - buffer) soft_time_limit_ms = total_time - buffer;
+        if (soft_time_limit_ms < 15) soft_time_limit_ms = 15;
 
-        auto end = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
-        auto time = duration.count();
-
-        std::cout << "Engine plays  : " << print_move(curr_move) << "\n";
-        std::cout << "Nodes explored: " << NODES << "\n";
-        std::cout << "Time taken    : " << time << " ms\n";
-        if (time != 0) std::cout << "Speed         : " << NODES / time << " nodes/ms\n\n";
-        else std::cout << "Speed         : " << NODES << " nodes/ms\n\n";
+        if (hard_time_limit_ms > total_time - buffer) hard_time_limit_ms = total_time - buffer;
+        if (hard_time_limit_ms < soft_time_limit_ms) hard_time_limit_ms = soft_time_limit_ms;
+        if (hard_time_limit_ms < 15) hard_time_limit_ms = 15;
     }
-    std::cout << "bestmove " << print_move(best_move) << std::endl;
-}
-
-void search_fixed_time(int time_ms)
-{
-    
-    int max_depth = 20;
     int previous_score = 0;
-    
     uint16_t best_move = 0;
     stop_search = false;
     timer_start = std::chrono::high_resolution_clock::now();
-    max_time = std::chrono::milliseconds(time_ms - 50);
+    soft_time = std::chrono::milliseconds(soft_time_limit_ms);
+    hard_time = std::chrono::milliseconds(hard_time_limit_ms);
 
     for (int curr_depth = 1; curr_depth <= max_depth; curr_depth++)
     {
@@ -2722,17 +2699,228 @@ void search_fixed_time(int time_ms)
         std::cout << "Time taken    : " << time << " ms\n";
         if (time != 0) std::cout << "Speed         : " << NODES / time << " nodes/ms\n\n";
         else std::cout << "Speed         : " << NODES << " nodes/ms\n\n";
+
+        if (time * 2 > soft_time_limit_ms) break;
     }
     std::cout << "bestmove " << print_move(best_move) << std::endl;
 }
 
-void search_time_control(int wtime, int btime, int winc, int binc)
-{
-    // to be done
-    // Calculate how much time to spend based on whose turn it is
-    // Run minimax for that amount of time
-    // std::cout << "bestmove " << best_move << "\n";
-}
+//void search_fixed_depth(int depth)
+//{
+//    // Run minimax to 'depth'
+//    // std::cout << "bestmove " << best_move << "\n";
+//    // uint16_t best_move = root(depth, game);
+//    int max_depth = depth;
+//    int previous_score = 0;
+//
+//    stop_search = false;
+//    timer_start = std::chrono::high_resolution_clock::now();
+//    max_time = std::chrono::milliseconds(36000000);
+//    
+//    uint16_t best_move = 0;
+//    
+//    for (int curr_depth = 1; curr_depth <= max_depth; curr_depth++)
+//    {
+//        std::cout << "Depth         : " << curr_depth << "\n";
+//        auto start = std::chrono::high_resolution_clock::now();
+//
+//        int window = 50; // 50 centipawns (half a pawn)
+//        int alpha = previous_score - window;
+//        int beta = previous_score + window;
+//
+//        uint16_t curr_move = 0;
+//        int32_t current_score = 0;
+//
+//        while (true) 
+//        {
+//            if (curr_depth <= 3) 
+//            {
+//                alpha = -1000000;
+//                beta = 1000000;
+//            }
+//
+//            current_score = root(curr_depth, game, alpha , beta, curr_move); // 2ms
+//
+//            if (current_score <= alpha)
+//            {
+//                alpha = -1000000;
+//                continue; 
+//            }
+//            else if (current_score >= beta)
+//            {
+//                beta = 1000000;
+//                continue;
+//            }
+//            break;
+//        }
+//        
+//        best_move = curr_move;
+//        previous_score = current_score;
+//
+//        auto end = std::chrono::high_resolution_clock::now();
+//        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+//        auto time = duration.count();
+//
+//        std::cout << "Engine plays  : " << print_move(curr_move) << "\n";
+//        std::cout << "Nodes explored: " << NODES << "\n";
+//        std::cout << "Time taken    : " << time << " ms\n";
+//        if (time != 0) std::cout << "Speed         : " << NODES / time << " nodes/ms\n\n";
+//        else std::cout << "Speed         : " << NODES << " nodes/ms\n\n";
+//    }
+//    std::cout << "bestmove " << print_move(best_move) << std::endl;
+//}
+//
+//void search_fixed_time(int time_ms)
+//{ 
+//    int max_depth = 20;
+//    int previous_score = 0;
+//    
+//    uint16_t best_move = 0;
+//    stop_search = false;
+//    timer_start = std::chrono::high_resolution_clock::now();
+//    max_time = std::chrono::milliseconds(time_ms - 50);
+//
+//    for (int curr_depth = 1; curr_depth <= max_depth; curr_depth++)
+//    {
+//        std::cout << "Depth         : " << curr_depth << "\n";
+//        auto start = std::chrono::high_resolution_clock::now();
+//
+//        int window = 50; // 50 centipawns (half a pawn)
+//        int alpha = previous_score - window;
+//        int beta = previous_score + window;
+//
+//        uint16_t curr_move = 0;
+//        int32_t current_score = 0;
+//
+//        while (true) 
+//        {
+//            if (curr_depth <= 3) 
+//            {
+//                alpha = -1000000;
+//                beta = 1000000;
+//            }
+//
+//            current_score = root(curr_depth, game, alpha , beta, curr_move); // 2ms
+//            if (stop_search) 
+//            {   
+//                int64_t total_time = (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - timer_start)).count();
+//                std::cout << "Total time: " << total_time << " ms\n\n";
+//                break; 
+//            }
+//
+//            if (current_score <= alpha)
+//            {
+//                alpha = -1000000;
+//                continue; 
+//            }
+//            else if (current_score >= beta)
+//            {
+//                beta = 1000000;
+//                continue;
+//            }
+//            break;
+//        }
+//        if (stop_search) 
+//        {   
+//            break; 
+//        }
+//        best_move = curr_move;
+//        previous_score = current_score;
+//
+//        auto end = std::chrono::high_resolution_clock::now();
+//        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+//        auto time = duration.count();
+//
+//        std::cout << "Engine plays  : " << print_move(curr_move) << "\n";
+//        std::cout << "Nodes explored: " << NODES << "\n";
+//        std::cout << "Time taken    : " << time << " ms\n";
+//        if (time != 0) std::cout << "Speed         : " << NODES / time << " nodes/ms\n\n";
+//        else std::cout << "Speed         : " << NODES << " nodes/ms\n\n";
+//    }
+//    std::cout << "bestmove " << print_move(best_move) << std::endl;
+//}
+//
+//void search_time_control(int wtime, int btime, int winc, int binc)
+//{
+//    // to be done
+//    // Calculate how much time to spend based on whose turn it is
+//    // Run minimax for that amount of time
+//    
+//    int total_time = game.side_to_move ? btime : wtime; // total time left
+//    int inc = game.side_to_move ? binc : winc;// increment per move
+//    
+//    int base_divisor = 40; // an expected safe number of moves that are left to play
+//    int buffer = 50; // for latency and overhead to avoid acciedental flagging
+//    int time_limit_ms = (total_time / base_divisor) + inc - buffer; // time allowed to play the current move
+//
+//    int max_depth = 40;
+//    int previous_score = 0;
+//    
+//    uint16_t best_move = 0;
+//    stop_search = false;
+//    timer_start = std::chrono::high_resolution_clock::now();
+//    max_time = std::chrono::milliseconds(time_limit_ms);
+//
+//    for (int curr_depth = 1; curr_depth <= max_depth; curr_depth++)
+//    {
+//        std::cout << "Depth         : " << curr_depth << "\n";
+//        auto start = std::chrono::high_resolution_clock::now();
+//
+//        int window = 50; // 50 centipawns (half a pawn)
+//        int alpha = previous_score - window;
+//        int beta = previous_score + window;
+//
+//        uint16_t curr_move = 0;
+//        int32_t current_score = 0;
+//
+//        while (true) 
+//        {
+//            if (curr_depth <= 3) 
+//            {
+//                alpha = -1000000;
+//                beta = 1000000;
+//            }
+//
+//            current_score = root(curr_depth, game, alpha , beta, curr_move); // 2ms
+//            if (stop_search) 
+//            {   
+//                int64_t total_time = (std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::high_resolution_clock::now() - timer_start)).count();
+//                std::cout << "Total time: " << total_time << " ms\n\n";
+//                break; 
+//            }
+//
+//            if (current_score <= alpha)
+//            {
+//                alpha = -1000000;
+//                continue; 
+//            }
+//            else if (current_score >= beta)
+//            {
+//                beta = 1000000;
+//                continue;
+//            }
+//            break;
+//        }
+//        if (stop_search) 
+//        {   
+//            break; 
+//        }
+//        best_move = curr_move;
+//        previous_score = current_score;
+//
+//        auto end = std::chrono::high_resolution_clock::now();
+//        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start);
+//        auto time = duration.count();
+//
+//        std::cout << "Engine plays  : " << print_move(curr_move) << "\n";
+//        std::cout << "Nodes explored: " << NODES << "\n";
+//        std::cout << "Time taken    : " << time << " ms\n";
+//        if (time != 0) std::cout << "Speed         : " << NODES / time << " nodes/ms\n\n";
+//        else std::cout << "Speed         : " << NODES << " nodes/ms\n\n";
+//    }
+//    std::cout << "bestmove " << print_move(best_move) << std::endl;
+//    // std::cout << "bestmove " << best_move << "\n";
+//}
 
 // uint16_t run1(int max_depth)
 // {

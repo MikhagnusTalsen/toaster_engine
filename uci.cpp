@@ -117,19 +117,11 @@ int main()
                 else if (param == "binc")
                     ss >> binc;
             }
-
-            if (depth > 0)
-            {
-                search_fixed_depth(depth);
-            }
-            else if (movetime > 0)
-            {
-                search_fixed_time(movetime);
-            }
-            else if (wtime > 0 || btime > 0)
-            {
-                search_time_control(wtime, btime, winc, binc);
-            }
+            search(depth, movetime, wtime, btime, winc, binc);
+        }
+        else if (token == "ucinewgame")
+        {
+            clear_TT();
         }
         else if (token == "quit")
         {
