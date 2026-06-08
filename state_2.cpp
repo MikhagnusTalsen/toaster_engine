@@ -2094,55 +2094,6 @@ std::string print_move(uint16_t move)
     return m;
 }
 
-void hash_perft(int depth, GameState &game1)
-{
-    if (!depth)
-        return;
-    MoveList list;
-    game1.generate_move(list, depth);
-    for (int i = 0; i < list.move_count; i++)
-    {
-        uint16_t move = list.moves_list[i].move;
-
-        int ep_copy = game1.ep_square;
-        int castle_copy = game1.castling_right;
-
-        u_int64_t saved_hash = game1.current_hash;
-        game1.make_move(move);
-
-        // check if move is legal
-        int current_side = game1.side_to_move ^ 1;
-        int sq = __builtin_ctzll(game1.bitboard[current_side ? BLACK_KING : WHITE_KING]);
-        if (game1.is_square_attacked(sq, !current_side))
-        {
-            game1.unmake_move(move);
-
-            game1.ep_square = ep_copy;
-            game1.castling_right = castle_copy;
-
-            continue;
-        }
-
-        hash_perft(depth - 1, game1);
-        game1.unmake_move(move);
-        if (saved_hash != game1.current_hash)
-        {
-            std::cout << "CRITICAL HASH DESYNC!\n";
-            std::cout << "Move causing issue: ";
-            std::cout << print_move(move);
-            std::cout << "\n";
-            std::cout << "before: " << saved_hash << "\n";
-            std::cout << " after: " << current_side << "\n";
-            // Optional: print out the board state or the before/after hashes here
-            exit(1);
-        }
-
-        game1.ep_square = ep_copy;
-        game1.castling_right = castle_copy;
-    }
-    return;
-}
-
 int quiescence(GameState &game, int alpha, int beta, int depth)
 {
     NODES++;
